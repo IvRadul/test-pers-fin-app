@@ -1,6 +1,6 @@
 import sqlite3
 import datetime
-from finance_tracker.models import Finance, Expense, Income
+from finance_tracker.models import Transaction
 from datetime import date
 
 def reg_adapters():
@@ -32,104 +32,87 @@ def reg_adapters():
     # 3. Enable converter support when connecting
     con = sqlite3.connect(":memory:", detect_types=sqlite3.PARSE_DECLTYPES)
 
+def create_connection(db_path):
+    #поддержка типов для работы адаптеров
+    conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+
+    #регистрируем адаптеры
+    reg_adapters()
+
+    #создание таблицы (если её нет)
+    conn.execute('''CREATE TABLE IF NOT EXISTS Transactions(
+                    id INTEGER PRIMARY KEY,
+                    type TEXT,
+                    amount INTEGER,
+                    date DATE,
+                    category TEXT)''')
+    conn.commit()
+    return conn
+
 #here we go
 class FinanceRepository:
-    def __init__(self, db_conn):
-        self.conn = sqlite3.connect(db_conn)
-        reg_adapters()
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS Expenses(
-                    id INTEGER PRIMARY KEY,
-                    amount INTEGER,
-                    date DATE,
-                    category TEXT)''')
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS Incomes(
-                    id INTEGER PRIMARY KEY,
-                    amount INTEGER,
-                    date DATE,
-                    category TEXT)''')
+    def __init__(self, connection):
+        self.conn = connection
     
     def add(self, finance_elem):
-        if isinstance(finance_elem, Expense):
+        if isinstance(finance_elem, Transaction):
             if finance_elem.id is None:
                 cur = self.conn.execute(
-                    "INSERT INTO Expenses (amount, date, category) VALUES (?, ?, ?)",
-                    (finance_elem.amount, finance_elem.date, finance_elem.cat) 
+                    "INSERT INTO Transactions (type, amount, date, category) VALUES (?, ?, ?, ?)",
+                    (finance_elem.trans_type, finance_elem.amount, finance_elem.date, finance_elem.category) 
                 )
                 finance_elem.id = cur.lastrowid
             else:
                 self.conn.execute(
-                    "UPDATE Expenses SET amount = ?, date = ?, category = ? WHERE id = ?",
-                    (finance_elem.amount, finance_elem.date, finance_elem.cat, finance_elem.id) 
+                    "UPDATE Transactions SET type = ?, amount = ?, date = ?, category = ? WHERE id = ?",
+                    (finance_elem.trans_type, finance_elem.amount, finance_elem.date, finance_elem.category, finance_elem.id) 
                 )
             self.conn.commit()
-        else:
-            if finance_elem.id is None:
-                cur = self.conn.execute(
-                    "INSERT INTO Incomes (amount, date, category) VALUES (?, ?, ?)",
-                    (finance_elem.amount, finance_elem.date, finance_elem.group) 
-                )
-                finance_elem.id = cur.lastrowid
-            else:
-                self.conn.execute(
-                    "UPDATE Incomes SET amount = ?, date = ?, category = ? WHERE id = ?",
-                    (finance_elem.amount, finance_elem.date, finance_elem.group, finance_elem.id) 
-                )
-            self.conn.commit()
-
+            
     def delete(self, finance_elem):
-        if isinstance(finance_elem, Expense):
+        if isinstance(finance_elem, Transaction):
             if finance_elem.id:
                 self.conn.execute(
-                    "DELETE FROM Expenses WHERE id = ?",
+                    "DELETE FROM Transactions WHERE id = ?",
                     (finance_elem.id) 
                 )
                 self.conn.commit()
             else:
                 raise KeyError(f"У записи {finance_elem} нет id")
         else:
-            if finance_elem.id:
-                self.conn.execute(
-                    "DELETE FROM Incomes WHERE id = ?",
-                    (finance_elem.id) 
-                )
-                self.conn.commit()
-            else:
-                raise KeyError(f"У записи {finance_elem} нет id")
+            pass
                   
-    def show_expenses(self, category):
+    def show_transactions(self, transaction_type=None, category=None):
         if category:
             data = self.conn.execute(
-                "SELECT * FROM Expenses WHERE category = ?", (category)
+                "SELECT * FROM Transactions WHERE category = ?", (category)
             ).fetchall()
         else:
             data = self.conn.execute(
-                "SELECT * FROM Expenses"
+                "SELECT * FROM Transactions"
             ).fetchall()
         return data
     
-    def show_incomes(self, category):
-        if category:
-            data = self.conn.execute(
-                "SELECT * FROM Incomes WHERE category = ?", (category)
-            ).fetchall()
-        else:
-            data = self.conn.execute(
-                "SELECT * FROM Incomes"
-            ).fetchall()
-        return data
-    
-    def show_period(self, month, year):
-        if not year:
+    def show_period(self, month=None, year=None):
+        if year is None and month is None:
             year = date.today().year
-        if not month:
             month = date.today().month
-        period = f"{year}-{month:02d}"
-        data_e = self.conn.execute(
-            "SELECT * FROM Expenses WHERE strftime('%Y-%m', date) = ?", (period,)
-        ).fetchall()
-        data_i = self.conn.execute(
-            "SELECT * FROM Incomes WHERE strftime('%Y-%m', date) = ?", (period,)
-        ).fetchall()
-        return data_e + data_i
+        if year is None:
+            year = date.today().year
+
+        if month:
+            period = f"{year}-{month:02d}"
+            data = self.conn.execute(
+                "SELECT * FROM Transactions WHERE strftime('%Y-%m', date) = ?", (period,)
+            ).fetchall()
+        else:
+            period = f"{year}"
+            data = self.conn.execute(
+                "SELECT * FROM Transactions WHERE strftime('%Y', date) = ?", (period,)
+            ).fetchall()
+        return data
         
         

@@ -15,18 +15,19 @@
 
 ## 📂 Структура проекта
 
+```text
 .gitignore
-│README.md
-│
-|finance_tracker/
-│   │   cli.py
-│   │   config.py
-│   │   db.py
-│   │   models.py
-│   │   __init__.py
-│   │   __main__.py
+README.md
+finance_tracker/
+├──cli.py
+├──config.py
+├──db.py
+├──models.py
+├──__init__.py
+├──__main__.py
+```
 
-##📌 Текущий статус
+## 📌 Текущий статус
 Это тестовая версия, активно дорабатывается.
 Планируемые фичи:
 
