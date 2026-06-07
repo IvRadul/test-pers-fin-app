@@ -1,12 +1,15 @@
 import datetime
 
 class Transaction:
-    def __init__(self, trans_type, amount, category='Other', date=datetime.date.today(), id=None):
+    def __init__(self, trans_type, amount, category='Other', date=None, id=None):
         self._id = id
         self.trans_type = trans_type
         self.amount = amount
         self.category = category
-        self.date = date
+        if date is None:
+            self._date = datetime.date.today()
+        else:
+            self.date = date
 
     @property 
     def id(self):
